@@ -1,8 +1,15 @@
 import sqlite3
 import os
+import asyncio
 from datetime import datetime
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+
+# ===== FIX LOOP (CHO PYTHON 3.14) =====
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
 # ===== DATABASE =====
 conn = sqlite3.connect("money.db", check_same_thread=False)
@@ -74,9 +81,12 @@ Ví dụ:
 
 # ===== HANDLE =====
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
     text = update.message.text.strip()
     day = get_day()
-    chat_id = update.message.chat_id
+    chat_id = update.effective_chat.id
 
     if text == "📊 Hôm nay":
         thu, chi, loi = get_stats(chat_id, day)
@@ -160,7 +170,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=menu()
             )
 
-# ===== RUN (SỬA CHO RENDER) =====
+# ===== RUN =====
 TOKEN = os.getenv("TOKEN")
 
 if not TOKEN:
@@ -169,7 +179,7 @@ if not TOKEN:
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT, handle))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
 print("Bot đang chạy...")
 app.run_polling()
